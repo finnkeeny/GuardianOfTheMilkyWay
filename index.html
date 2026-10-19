@@ -607,6 +607,11 @@ const WEAPONS = {
     cooldown:6.5, damage:3, splash:10, count:15, spreadAngle:4.71,
     desc:'15× rack · 3 dmg · 10px splash — fire a 270 degree spread blast of 15 tiny missiles.',
   },
+  seeker_swarm:{
+    name:'Seeker Swarm', type:'explosive', cost:5000, color:'#ff4da6',
+    cooldown:6.5, damage:3, splash:10, count:15, spreadAngle:4.71, homing:true, turnRate:3.2,
+    desc:'15× rack · 3 dmg · 10px splash — fire 15 seeking missiles in a 270 degree spread.',
+  },
 };
 
 // Refund table for players migrating off the old leveled weapon/missile tracks (see
@@ -1576,7 +1581,7 @@ class Missile{
     this.x=x; this.y=y; this.angle=angle;
     this.vx=Math.sin(angle)*360; this.vy=-Math.cos(angle)*360;
     this.damage=damage; this.splash=splash;
-    this.radius=5; this.life=1.8; this.exploded=false;
+    this.radius=5; this.life=homing ? Infinity : 1.8; this.exploded=false;
     this.speed=360;
     this.homing=homing; this.findTarget=findTarget; this.turnRate=turnRate;
     this.color=color;
