@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=47dc36ec-e281-4093-8e2d-49a4e7429c86
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guardian of the Milky Way</title>
 <link rel="icon" type="image/png" href="favicon.png">
@@ -247,6 +250,15 @@
   }
   .hud-missile.ready{color:var(--amber);border-color:rgba(255,184,77,0.4);}
   .hud-missile.hidden{display:none;}
+  .hud-gadgets{display:flex;flex-direction:column;align-items:stretch;gap:5px;}
+  .hud-gadgets.hidden{display:none;}
+  .gadget-btn{
+    min-width:176px;background:rgba(9,15,28,0.88);border:1px solid var(--line-bright);
+    color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;
+    text-align:left;padding:7px 10px;cursor:pointer;pointer-events:auto;
+  }
+  .gadget-btn:hover:not(:disabled){background:rgba(79,240,255,0.14);border-color:var(--cyan);}
+  .gadget-btn:disabled{color:var(--text-faint);cursor:not-allowed;opacity:.8;}
   .hud-timer{
     background:rgba(9,15,28,0.7);border:1px solid var(--line);padding:6px 14px;
     font-size:13px;color:var(--amber);letter-spacing:1px;
@@ -398,6 +410,11 @@
       <div class="hud-lives" id="hudLives"></div>
       <div class="hud-shield hidden" id="hudShield"></div>
       <div class="hud-missile hidden" id="hudMissile">MISSILES READY</div>
+      <div class="hud-gadgets hidden" id="hudGadgets">
+        <button class="gadget-btn" data-gadget="emp">1 · EMP PULSE — READY</button>
+        <button class="gadget-btn" data-gadget="nova">2 · NOVA CHARGE — READY</button>
+        <button class="gadget-btn" data-gadget="phase">3 · PHASE CLOAK — READY</button>
+      </div>
       <div class="hud-timer hidden" id="hudTimer">0s</div>
     </div>
   </div>
@@ -462,13 +479,16 @@ const KEY_ALIASES = {
 // on arrow keys, or scrolling on Space) while the game is capturing input.
 const PREVENT_DEFAULT_CODES = [
   'KeyW','KeyA','KeyD','Space','ShiftLeft','ShiftRight',
-  'ArrowUp','ArrowLeft','ArrowRight','ArrowDown',
+  'ArrowUp','ArrowLeft','ArrowRight','ArrowDown','Digit1','Digit2','Digit3',
 ];
 
 window.addEventListener('keydown', e=>{
   if(PREVENT_DEFAULT_CODES.includes(e.code)) e.preventDefault();
   keys.add(e.code);
   if(KEY_ALIASES[e.code]) keys.add(KEY_ALIASES[e.code]); // also register the canonical key
+  if(!e.repeat && e.code==='Digit1') useMissionGadget('emp');
+  if(!e.repeat && e.code==='Digit2') useMissionGadget('nova');
+  if(!e.repeat && e.code==='Digit3') useMissionGadget('phase');
   if(e.code==='Escape') handleEscape();
 });
 window.addEventListener('keyup', e=>{
@@ -607,6 +627,11 @@ const WEAPONS = {
     cooldown:6.5, damage:3, splash:10, count:15, spreadAngle:4.71,
     desc:'15× rack · 3 dmg · 10px splash — fire a 270 degree spread blast of 15 tiny missiles.',
   },
+  seeker_swarm:{
+    name:'Seeker Swarm', type:'explosive', cost:5000, color:'#ff4da6',
+    cooldown:6.5, damage:3, splash:10, count:15, spreadAngle:4.71, homing:true, turnRate:3.2,
+    desc:'15× rack · 3 dmg · 10px splash — fire 15 seeking missiles in a 270 degree spread.',
+  },
 };
 
 // Refund table for players migrating off the old leveled weapon/missile tracks (see
@@ -648,6 +673,25 @@ const MISSIONS = [
     reward:480},
 
   {id:'m12', name:'Void Reckoning', brief:'Everything the sector has left, all at once. Good luck, pilot.', type:'enemies',   target:14, timeLimit:150, spawn:{asteroidInterval:0.8, enemyInterval:1.6, eliteChance:0.4, ramp:true}, reward:800},
+  {id:'m13', name:'Shatterpoint', brief:'A dense debris field and a growing raider force threaten the frontier.', type:'combo',
+    comboTargets:{enemies:10, asteroids:22},
+    spawn:{asteroidInterval:0.65, enemyInterval:2.2, eliteChance:0.2, ramp:true},
+    reward:900},
+  {id:'m14', name:'Armada Breaker', brief:'Cut through a reinforced enemy armada before the sector is lost.', type:'enemies', target:22, timeLimit:150,
+    spawn:{asteroidInterval:0.55, enemyInterval:1.5, eliteChance:0.35, ramp:true},
+    reward:1050},
+  {id:'m15', name:'Colossus Hunt', brief:'Three capital ships are advancing behind a relentless screen of fighters.', type:'boss', bossName:'Colossus-class warships', bossCount:3,
+    spawn:{asteroidInterval:0.45, enemyInterval:1.7, eliteChance:0.3, maxAsteroids:40, maxEnemies:12, ramp:true},
+    bossConfig:{radius:56, hp:150, speed:90, fireInterval:0.42, bulletSpeed:420, burstCount:6},
+    reward:1200},
+  {id:'m16', name:'Ashes of Orion', brief:'Break the blockade and clear the largest debris field on record.', type:'combo',
+    comboTargets:{enemies:18, asteroids:36},
+    spawn:{asteroidInterval:0.35, enemyInterval:1.2, eliteChance:0.5, maxAsteroids:50, maxEnemies:14, ramp:true},
+    reward:1400},
+  {id:'m17', name:'The End of Everything', brief:'Seven enormous flagships, endless escorts, and an asteroid storm. Emergency support: +4 lives and +3 shield charges.', type:'boss', bossName:'Apocalypse-class flagships', bossCount:7, bossSpawnInterval:0.8, bonusLives:4, bonusShieldCharges:3,
+    spawn:{asteroidInterval:0.22, enemyInterval:0.65, eliteChance:0.65, maxAsteroids:70, maxEnemies:27, ramp:true},
+    bossConfig:{radius:72, hp:420, speed:76, fireInterval:0.3, bulletSpeed:460, burstCount:7},
+    reward:2000},
 ];
 
 /* ---------------------------- game state ---------------------------- */
@@ -1424,6 +1468,7 @@ class Ship{
     this.thrusting=false;
     this.alive=true;
     this.shieldFlash=0;
+    this.bonusShieldCharges=0;
     const shieldLvl = UPGRADE_TRACKS.shield.levels[game.upgrades.shield];
     this.shield = shieldLvl.maxCharges;
     this.shieldRegenTimer = shieldLvl.regenTime;
@@ -1459,11 +1504,12 @@ class Ship{
     if(this.invulnTimer>0) this.invulnTimer -= dt;
     if(this.shieldFlash>0) this.shieldFlash = Math.max(0, this.shieldFlash-dt);
 
-    if(shield.maxCharges>0 && this.shield<shield.maxCharges){
+    const maxShieldCharges = shield.maxCharges + this.bonusShieldCharges;
+    if(maxShieldCharges>0 && this.shield<maxShieldCharges){
       this.shieldRegenTimer -= dt;
       if(this.shieldRegenTimer<=0){
         this.shield++;
-        this.shieldRegenTimer = shield.regenTime;
+        this.shieldRegenTimer = shield.regenTime || 12;
       }
     }
 
@@ -1490,7 +1536,7 @@ class Ship{
     this.invulnTimer = this.stats.hull.invuln;
     if(this.shield>0){
       this.shield--;
-      this.shieldRegenTimer = this.stats.shield.regenTime;
+      this.shieldRegenTimer = this.stats.shield.regenTime || (this.bonusShieldCharges>0 ? 12 : 0);
       this.shieldFlash = 0.3;
       shake(6);
       spawnParticles(this.x,this.y,'#7fd7ff',16,0.4,180);
@@ -1576,7 +1622,7 @@ class Missile{
     this.x=x; this.y=y; this.angle=angle;
     this.vx=Math.sin(angle)*360; this.vy=-Math.cos(angle)*360;
     this.damage=damage; this.splash=splash;
-    this.radius=5; this.life=1.8; this.exploded=false;
+    this.radius=5; this.life=homing ? Infinity : 1.8; this.exploded=false;
     this.speed=360;
     this.homing=homing; this.findTarget=findTarget; this.turnRate=turnRate;
     this.color=color;
@@ -1817,7 +1863,12 @@ function objectiveText(m){
   if(m.type==='asteroids') return `Destroy ${m.target} asteroids`;
   if(m.type==='enemies') return `Destroy ${m.target} enemy ships${m.timeLimit?` within ${m.timeLimit}s`:''}`;
   if(m.type==='survive') return `Survive ${m.target} seconds`;
-  if(m.type==='boss') return `Destroy the ${m.bossName||'enemy flagship'}`;
+  if(m.type==='boss'){
+    const bossCount = m.bossCount||1;
+    return bossCount>1
+      ? `Destroy all ${bossCount} ${m.bossName||'enemy flagships'}`
+      : `Destroy the ${m.bossName||'enemy flagship'}`;
+  }
   if(m.type==='combo') return `Destroy ${m.comboTargets.enemies} enemy ships AND ${m.comboTargets.asteroids} asteroids`;
 }
 function objectiveLabel(m){
@@ -1825,7 +1876,8 @@ function objectiveLabel(m){
   if(m.type==='enemies') return `ENEMIES DESTROYED — ${mission.enemiesDestroyed}/${m.target}`;
   if(m.type==='survive') return `SURVIVE — ${Math.min(mission.timeElapsed,m.target).toFixed(0)}/${m.target}s`;
   if(m.type==='boss'){
-    // find the live boss to read its current hp; if it's already dead, show 0
+    const bossCount = m.bossCount||1;
+    if(bossCount>1) return `${(m.bossName||'FLAGSHIPS').toUpperCase()} — ${mission.bossesDefeated}/${bossCount} DESTROYED`;
     const boss = enemies.find(e=>e.boss && !e.dead);
     const hp = boss ? Math.max(0,Math.ceil(boss.hp)) : 0;
     return `${(m.bossName||'FLAGSHIP').toUpperCase()} INTEGRITY — ${hp}/${m.bossConfig.hp}`;
@@ -1836,17 +1888,24 @@ function objectiveLabel(m){
 function launchMission(id){
   const m = MISSIONS.find(mm=>mm.id===id);
   bullets.length=0; enemyBullets.length=0; missiles.length=0; mines.length=0; asteroids.length=0; enemies.length=0; particles.length=0;
-  ship.reset();
   const hullLvl = UPGRADE_TRACKS.hull.levels[game.upgrades.hull];
   mission = {
     id:m.id, type:m.type, target:m.target, timeLimit:m.timeLimit, spawn:m.spawn,
     bossConfig:m.bossConfig||null,       // only used when type==='boss'
+    bossCount:m.bossCount||1,
+    bossSpawnInterval:m.bossSpawnInterval||1,
+    bonusLives:m.bonusLives||0,
+    gadgetCooldowns:{emp:0,nova:0,phase:0},
     comboTargets:m.comboTargets||null,   // only used when type==='combo'
     timeElapsed:0, asteroidsDestroyed:0, enemiesDestroyed:0,
     asteroidTimer:rand(0.4,1.0), enemyTimer:rand(0.8,1.6),
-    bossSpawned:false, bossDefeated:false, // only used when type==='boss'
-    lives:hullLvl.maxLives, ended:false,
+    bossSpawnTimer:1.0, bossesSpawned:0, bossesDefeated:0,
+    lives:hullLvl.maxLives+(m.bonusLives||0), ended:false,
   };
+  ship.reset();
+  ship.bonusShieldCharges=m.bonusShieldCharges||0;
+  ship.shield+=ship.bonusShieldCharges;
+  if(ship.bonusShieldCharges && !ship.stats.shield.regenTime) ship.shieldRegenTimer=12;
   game.state='mission';
   showScreen(null);
   updateHUD();
@@ -1879,8 +1938,54 @@ function handleEscape(){
   }
 }
 
+function useMissionGadget(gadget){
+  if(game.state!=='mission' || !mission || mission.id!=='m17' || !mission.gadgetCooldowns) return false;
+  if(!Object.prototype.hasOwnProperty.call(mission.gadgetCooldowns,gadget) || mission.gadgetCooldowns[gadget]>0) return false;
+
+  if(gadget==='emp'){
+    enemyBullets.length=0;
+    for(const enemy of enemies){
+      if(!enemy.dead) enemy.fireTimer=Math.max(enemy.fireTimer,5);
+    }
+    mission.gadgetCooldowns.emp=35;
+    spawnParticles(ship.x,ship.y,'#4ff0ff',60,0.9,320);
+    shake(10);
+  } else if(gadget==='nova'){
+    for(const asteroid of asteroids){
+      if(asteroid.dead) continue;
+      asteroid.dead=true;
+      mission.asteroidsDestroyed++;
+      spawnParticles(asteroid.x,asteroid.y,'#c9d6ea',12,0.5,220);
+    }
+    for(const enemy of enemies){
+      if(enemy.dead) continue;
+      enemy.hp-=enemy.boss?90:9999;
+      if(enemy.hp<=0){
+        enemy.dead=true;
+        mission.enemiesDestroyed++;
+        if(enemy.boss) mission.bossesDefeated++;
+        spawnParticles(enemy.x,enemy.y,enemy.boss?'#ffb84d':'#ff3d81',enemy.boss?40:20,0.8,260);
+      }
+    }
+    mission.gadgetCooldowns.nova=55;
+    spawnParticles(ship.x,ship.y,'#ffb84d',100,1.1,460);
+    shake(16);
+  } else if(gadget==='phase'){
+    ship.invulnTimer=Math.max(ship.invulnTimer,6);
+    mission.gadgetCooldowns.phase=30;
+    ship.shieldFlash=0.3;
+    spawnParticles(ship.x,ship.y,'#c04dff',36,0.8,260);
+  }
+
+  updateHUD();
+  return true;
+}
+
 function updateMission(dt){
   mission.timeElapsed += dt;
+  for(const gadget of Object.keys(mission.gadgetCooldowns||{})){
+    mission.gadgetCooldowns[gadget]=Math.max(0,mission.gadgetCooldowns[gadget]-dt);
+  }
 
   if(mission.timeLimit && mission.type!=='survive' && mission.timeElapsed>=mission.timeLimit){
     endMission(false,'time'); return;
@@ -1892,24 +1997,25 @@ function updateMission(dt){
   let intervalScale=1;
   if(mission.spawn.ramp) intervalScale = Math.max(0.45, 1 - mission.timeElapsed/180);
 
-  // boss missions: spawn the single named boss ~1s after launch, then never spawn another.
-  // Regular enemy spawns are still gated by spawn.enemyInterval, which boss missions set to
-  // Infinity, so this is purely additive and doesn't touch the normal-enemy spawn path below.
-  if(mission.type==='boss' && !mission.bossSpawned && mission.timeElapsed>=1.0){
-    spawnEnemyAtEdge(false, mission.bossConfig);
-    mission.bossSpawned = true;
+  if(mission.type==='boss' && mission.bossesSpawned<mission.bossCount){
+    mission.bossSpawnTimer-=dt;
+    if(mission.bossSpawnTimer<=0){
+      spawnEnemyAtEdge(false,mission.bossConfig);
+      mission.bossesSpawned++;
+      mission.bossSpawnTimer=mission.bossSpawnInterval;
+    }
   }
 
   if(mission.spawn.asteroidInterval!==Infinity){
     mission.asteroidTimer -= dt;
-    if(mission.asteroidTimer<=0 && asteroids.length<26){
+    if(mission.asteroidTimer<=0 && asteroids.length<(mission.spawn.maxAsteroids||26)){
       spawnAsteroidAtEdge();
       mission.asteroidTimer = mission.spawn.asteroidInterval*intervalScale*rand(0.8,1.2);
     }
   }
   if(mission.spawn.enemyInterval!==Infinity){
     mission.enemyTimer -= dt;
-    if(mission.enemyTimer<=0 && enemies.length<8){
+    if(mission.enemyTimer<=0 && enemies.length<(mission.spawn.maxEnemies||8)){
       const elite = Math.random() < (mission.spawn.eliteChance||0);
       spawnEnemyAtEdge(elite);
       mission.enemyTimer = mission.spawn.enemyInterval*intervalScale*rand(0.8,1.2);
@@ -1959,7 +2065,7 @@ function updateMission(dt){
         if(e.hp<=0){
           e.dead=true;
           mission.enemiesDestroyed++;
-          if(e.boss) mission.bossDefeated = true; // flips the 'boss' mission's completion check
+          if(e.boss) mission.bossesDefeated++;
           spawnParticles(e.x,e.y, e.boss?'#ffb84d':(e.elite?'#ff3d81':'#ff7fae'), e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
           shake(e.boss?12:(e.elite?6:3));
         }
@@ -1997,7 +2103,7 @@ function updateMission(dt){
       if(e.hp<=0){
         e.dead=true;
         mission.enemiesDestroyed++;
-        if(e.boss) mission.bossDefeated = true;
+        if(e.boss) mission.bossesDefeated++;
         spawnParticles(e.x,e.y, e.boss?'#ffb84d':'#ff3d81', e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
         if(e.boss) shake(12);
       }
@@ -2035,7 +2141,7 @@ function updateMission(dt){
   if(mission.type==='asteroids' && mission.asteroidsDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='enemies' && mission.enemiesDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='survive' && mission.timeElapsed>=mission.target){ endMission(true); return; }
-  if(mission.type==='boss' && mission.bossDefeated){ endMission(true); return; }
+  if(mission.type==='boss' && mission.bossesDefeated>=mission.bossCount){ endMission(true); return; }
   if(mission.type==='combo' && mission.enemiesDestroyed>=mission.comboTargets.enemies && mission.asteroidsDestroyed>=mission.comboTargets.asteroids){ endMission(true); return; }
 
   updateHUD();
@@ -2067,11 +2173,12 @@ function drawShip(s){
   ctx.restore();
 
   const shieldLvl = s.stats.shield;
-  if(shieldLvl.maxCharges>0 && s.shield>0){
+  const maxShieldCharges = shieldLvl.maxCharges + s.bonusShieldCharges;
+  if(maxShieldCharges>0 && s.shield>0){
     ctx.save();
     ctx.translate(s.x,s.y);
     const flashBoost = s.shieldFlash>0 ? s.shieldFlash/0.3 : 0;
-    ctx.globalAlpha = 0.2 + 0.5*(s.shield/shieldLvl.maxCharges) + flashBoost*0.4;
+    ctx.globalAlpha = 0.2 + 0.5*(s.shield/maxShieldCharges) + flashBoost*0.4;
     ctx.strokeStyle='#7fd7ff';
     ctx.shadowColor='#7fd7ff'; ctx.shadowBlur=14;
     ctx.lineWidth=1.5;
@@ -2205,15 +2312,16 @@ function updateHUD(){
   if(!mission) return;
   const m = MISSIONS.find(mm=>mm.id===mission.id);
   document.getElementById('hudObjective').textContent = objectiveLabel(m);
-  const maxLives = UPGRADE_TRACKS.hull.levels[game.upgrades.hull].maxLives;
+  const maxLives = UPGRADE_TRACKS.hull.levels[game.upgrades.hull].maxLives + mission.bonusLives;
   document.getElementById('hudLives').innerHTML = Array.from({length:maxLives}).map((_,i)=>
     `<span class="life-icon ${i<mission.lives?'':'spent'}">▲</span>`).join('');
 
   const shieldLvl = UPGRADE_TRACKS.shield.levels[game.upgrades.shield];
+  const maxShieldCharges = shieldLvl.maxCharges + ship.bonusShieldCharges;
   const shieldRow = document.getElementById('hudShield');
-  if(shieldLvl.maxCharges>0){
+  if(maxShieldCharges>0){
     shieldRow.classList.remove('hidden');
-    shieldRow.innerHTML = Array.from({length:shieldLvl.maxCharges}).map((_,i)=>
+    shieldRow.innerHTML = Array.from({length:maxShieldCharges}).map((_,i)=>
       `<span class="shield-icon ${i<ship.shield?'':'spent'}">◆</span>`).join('');
   } else {
     shieldRow.classList.add('hidden');
@@ -2229,9 +2337,21 @@ function updateHUD(){
   } else {
     secondaryRow.classList.add('hidden');
   }
+  const gadgetRow=document.getElementById('hudGadgets');
+  const hasGadgets=mission.id==='m17';
+  gadgetRow.classList.toggle('hidden',!hasGadgets);
+  if(hasGadgets){
+    const gadgetNames={emp:'EMP PULSE',nova:'NOVA CHARGE',phase:'PHASE CLOAK'};
+    gadgetRow.querySelectorAll('[data-gadget]').forEach(button=>{
+      const remaining=mission.gadgetCooldowns[button.dataset.gadget];
+      const number=button.dataset.gadget==='emp'?'1':button.dataset.gadget==='nova'?'2':'3';
+      button.disabled=remaining>0;
+      button.textContent=`${number} · ${gadgetNames[button.dataset.gadget]} — ${remaining>0?`${Math.ceil(remaining)}s`:'READY'}`;
+    });
+  }
   document.getElementById('hudHint').textContent = secondary
-    ? `W THRUST · A/D ROTATE · SPACE FIRE · SHIFT ${secondary.name.toUpperCase()} · ESC ABORT`
-    : 'W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT';
+    ? `${hasGadgets?'1 EMP · 2 NOVA · 3 PHASE · ':''}W THRUST · A/D ROTATE · SPACE FIRE · SHIFT ${secondary.name.toUpperCase()} · ESC ABORT`
+    : `${hasGadgets?'1 EMP · 2 NOVA · 3 PHASE · ':''}W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT`;
 
   const timerEl = document.getElementById('hudTimer');
   if(m.type==='survive'){
@@ -2540,6 +2660,9 @@ document.getElementById('authGuestLink').addEventListener('click', authPlayAsGue
 document.getElementById('authPassword').addEventListener('keydown', e=>{
   if(e.key==='Enter') authSignIn();
 });
+document.querySelectorAll('#hudGadgets [data-gadget]').forEach(button=>{
+  button.addEventListener('click',()=>useMissionGadget(button.dataset.gadget));
+});
 
 let lastTime=null;
 function loop(t){
@@ -2578,3 +2701,4 @@ boot();
 </body>
 
 </html>
+<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="47dc36ec-e281-4093-8e2d-49a4e7429c86" data-app-host="app.netlify.com"></script>
