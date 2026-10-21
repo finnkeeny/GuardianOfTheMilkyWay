@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=47dc36ec-e281-4093-8e2d-49a4e7429c86
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guardian of the Milky Way</title>
 <link rel="icon" type="image/png" href="favicon.png">
@@ -478,7 +481,10 @@ window.addEventListener('keyup', e=>{
 
 /* ---------------------------- utility ---------------------------- */
 function rand(a,b){ return a + Math.random()*(b-a); }
-function dist2(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
+function dist2(a,b){
+  const dx=wrapDelta(a.x,b.x,canvas.width), dy=wrapDelta(a.y,b.y,canvas.height);
+  return dx*dx+dy*dy;
+}
 function wrap(pos,max){ if(pos<0) return pos+max; if(pos>max) return pos-max; return pos; }
 function wrapDelta(a,b,max){ let d=b-a; if(d>max/2) d-=max; if(d<-max/2) d+=max; return d; }
 function filterInPlace(arr, keepFn){ let w=0; for(let i=0;i<arr.length;i++){ if(keepFn(arr[i])) arr[w++]=arr[i]; } arr.length=w; }
@@ -511,10 +517,10 @@ const UPGRADE_TRACKS = {
     name:'Shields',
     levels:[
       {maxCharges:0, regenTime:0,   cost:0},
-      {maxCharges:1, regenTime:6.5, cost:180},
-      {maxCharges:2, regenTime:5.5, cost:320},
-      {maxCharges:3, regenTime:4.5, cost:480},
-      {maxCharges:5, regenTime:2, cost:10000},
+      {maxCharges:1, regenTime:10, cost:180},
+      {maxCharges:2, regenTime:9, cost:320},
+      {maxCharges:3, regenTime:8, cost:480},
+      {maxCharges:4, regenTime:7, cost:10000},
     ],
     desc:l=> l.maxCharges===0 ? 'No shield generator installed' : `Charges ${l.maxCharges} · Regen ${l.regenTime.toFixed(1)}s`,
   },
@@ -587,6 +593,11 @@ const WEAPONS = {
     cooldown:3.2, damage:4, splash:40, count:1, homing:true, turnRate:3.2,
     desc:'1× rack · 4 dmg · 40px splash · homes in on the nearest target.',
   },
+  seeker_swarm:{
+    name:'Seeker Swarm', type:'explosive', cost:5000, color:'#ff70c5',
+    cooldown:8.0, damage:2, splash:28, count:20, spreadAngle:2.2, homing:true, turnRate:3.2,
+    desc:'20× rack · 2 dmg · 28px splash — launches 20 seeking missiles in a wide volley.',
+  },
   proximity_mine:{
     name:'Proximity Mine', type:'mine', cost:380, color:'#fff44d',
     cooldown:1.8, damage:5, splash:60, armTime:0.8,
@@ -606,6 +617,17 @@ const WEAPONS = {
     name:'Neutron Blast', type:'explosive', cost:10000, color:'#7fffd4',
     cooldown:6.5, damage:3, splash:10, count:15, spreadAngle:4.71,
     desc:'15× rack · 3 dmg · 10px splash — fire a 270 degree spread blast of 15 tiny missiles.',
+  },
+};
+
+const FINAL_MISSION_WEAPONS = {
+  primary:{
+    name:'Annihilator Cannon', type:'ballistic', color:'#4dff9f',
+    cooldown:0.2, bulletSpeed:900, damage:3, count:3, spreadAngle:0.16,
+  },
+  secondary:{
+    name:'Guardian Seeker Array', type:'explosive', color:'#7fffd4',
+    cooldown:5.5, damage:18, splash:64, count:6, spreadAngle:0.8, homing:true, turnRate:4.5,
   },
 };
 
@@ -636,7 +658,7 @@ const MISSIONS = [
     bossConfig:{radius:38, hp:75, speed:110, fireInterval:0.55, bulletSpeed:400, burstCount:5},
     reward:450},
 
-  {id:'m9', name:'Debris Storm',   brief:'A shattered moon has filled the sector with dense, fast rock.',  type:'asteroids', target:16, spawn:{asteroidInterval:0.5, enemyInterval:Infinity}, reward:380},
+  {id:'m9', name:'Black Box Recovery', brief:'Recover five flight recorders from a debris field while scouts close in.', type:'salvage', target:5, spawn:{salvageInterval:4.5, asteroidInterval:2.2, enemyInterval:4.5}, reward:420},
 
   {id:'m10', name:'Deep Patrol',   brief:'Hold this sector for two full minutes. Hostiles will escalate.', type:'survive',    target:120, spawn:{asteroidInterval:0.9, enemyInterval:2.6, eliteChance:0.2, ramp:true}, reward:520},
 
@@ -648,6 +670,55 @@ const MISSIONS = [
     reward:480},
 
   {id:'m12', name:'Void Reckoning', brief:'Everything the sector has left, all at once. Good luck, pilot.', type:'enemies',   target:14, timeLimit:150, spawn:{asteroidInterval:0.8, enemyInterval:1.6, eliteChance:0.4, ramp:true}, reward:800},
+
+  // Late-campaign missions keep increasing enemy pressure, objective counts, and boss strength.
+  {id:'m13', name:'Razor Belt', brief:'Cross a razor-thin asteroid belt packed with fast-moving debris.', type:'asteroids', target:20, spawn:{asteroidInterval:0.42, enemyInterval:Infinity}, reward:650},
+  {id:'m14', name:'Elite Pursuit', brief:'Elite raiders are closing in. Eliminate the entire strike force.', type:'enemies', target:16, timeLimit:150, spawn:{asteroidInterval:1.5, enemyInterval:1.5, eliteChance:0.45, ramp:true}, reward:900},
+  {id:'m15', name:'Siege Line', brief:'Hold the line for two and a half minutes against relentless waves.', type:'survive', target:150, spawn:{asteroidInterval:0.75, enemyInterval:2.2, eliteChance:0.3, ramp:true}, reward:950},
+  {id:'m16', name:'The Iron Behemoth', brief:'A faster, heavily armed battleship is blocking the route. Destroy it.', type:'boss', bossName:'Iron Behemoth',
+    spawn:{asteroidInterval:2.2, enemyInterval:Infinity},
+    bossConfig:{radius:42, hp:110, speed:125, fireInterval:0.48, bulletSpeed:420, burstCount:6},
+    reward:1000},
+  {id:'m17', name:'Crossfire', brief:'Destroy raiders and clear the debris field before reinforcements arrive.', type:'combo',
+    comboTargets:{enemies:8, asteroids:14},
+    spawn:{asteroidInterval:0.9, enemyInterval:2.2, eliteChance:0.28, ramp:true},
+    reward:1100},
+  {id:'m18', name:'Hunter Armada', brief:'A large elite armada has entered the sector. Take out every ship.', type:'enemies', target:18, timeLimit:165, spawn:{asteroidInterval:1.1, enemyInterval:1.3, eliteChance:0.5, ramp:true}, reward:1200},
+  {id:'m19', name:'Ghost Signal', brief:'Track down eight drifting signal cores through a hostile wreck field.', type:'salvage', target:8, spawn:{salvageInterval:3.1, asteroidInterval:1.25, enemyInterval:2.8, eliteChance:0.2, ramp:true}, reward:1450},
+  {id:'m20', name:'Long Night', brief:'Survive three minutes as asteroid and elite waves build around you.', type:'survive', target:180, spawn:{asteroidInterval:0.65, enemyInterval:1.9, eliteChance:0.38, ramp:true}, reward:1350},
+  {id:'m21', name:'The War Engine', brief:'A colossal war engine is tearing through the outer defenses.', type:'boss', bossName:'War Engine',
+    spawn:{asteroidInterval:1.8, enemyInterval:Infinity},
+    bossConfig:{radius:46, hp:150, speed:140, fireInterval:0.42, bulletSpeed:440, burstCount:7},
+    reward:1500},
+  {id:'m22', name:'Three Fronts', brief:'Fight through a triple threat of raiders, elites, and asteroids.', type:'combo',
+    comboTargets:{enemies:10, asteroids:18},
+    spawn:{asteroidInterval:0.72, enemyInterval:1.8, eliteChance:0.4, ramp:true},
+    reward:1600},
+  {id:'m23', name:'Elite Breaker', brief:'Break the elite fleet before its reinforcements overwhelm you.', type:'enemies', target:20, timeLimit:180, spawn:{asteroidInterval:0.9, enemyInterval:1.15, eliteChance:0.58, ramp:true}, reward:1750},
+  {id:'m24', name:'Endless Debris', brief:'Clear a field of 28 massive asteroids while hostiles close in.', type:'asteroids', target:28, spawn:{asteroidInterval:0.32, enemyInterval:3.0, eliteChance:0.35, ramp:true}, reward:1850},
+  {id:'m25', name:'Last Watch', brief:'Endure three and a half minutes of escalating enemy waves.', type:'survive', target:210, spawn:{asteroidInterval:0.58, enemyInterval:1.65, eliteChance:0.45, ramp:true}, reward:2000},
+  {id:'m26', name:'The Citadel', brief:'The Citadel has arrived. Survive its punishing volleys and bring it down.', type:'boss', bossName:'The Citadel',
+    spawn:{asteroidInterval:0.95, enemyInterval:Infinity},
+    bossConfig:{radius:50, hp:300, speed:165, fireInterval:0.30, bulletSpeed:480, burstCount:9},
+    reward:2200},
+  {id:'m27', name:'Total Eclipse', brief:'Destroy a powerful strike force and clear the field of its debris.', type:'combo',
+    comboTargets:{enemies:18, asteroids:28},
+    spawn:{asteroidInterval:0.48, enemyInterval:1.2, eliteChance:0.6, ramp:true},
+    reward:2400},
+  {id:'m28', name:'Final Offensive', brief:'The remaining enemy fleet is making its final push. Stop it.', type:'enemies', target:30, timeLimit:180, spawn:{asteroidInterval:0.58, enemyInterval:0.82, eliteChance:0.75, ramp:true}, reward:2600},
+  {id:'m29', name:'Event Horizon', brief:'Hold your position for five minutes in the most hostile sector yet.', type:'survive', target:300, spawn:{asteroidInterval:0.42, enemyInterval:1.1, eliteChance:0.7, ramp:true}, reward:2900},
+  {id:'m30', name:'The Final Guardians', brief:'Defeat three flagships to secure the galaxy. This is your final test.', type:'boss', bossName:'The Final Guardians', bossCount:3,
+    spawn:{asteroidInterval:1.5, enemyInterval:Infinity},
+    bossConfig:{radius:60, hp:150, speed:115, fireInterval:0.55, bulletSpeed:380, burstCount:5},
+    reward:3500},
+  {id:'m31', name:'Slipstream Run', brief:'Thread the ship through six navigation gates before the route collapses.', type:'relay', target:6, timeLimit:90, spawn:{asteroidInterval:2.2, enemyInterval:Infinity}, reward:1200},
+  {id:'m32', name:'Minefield Courier', brief:'Race through eight relay gates while raiders pressure your escape route.', type:'relay', target:8, timeLimit:115, spawn:{asteroidInterval:1.6, enemyInterval:3.2, eliteChance:0.15}, reward:1650},
+  {id:'m33', name:'Redline Intercept', brief:'Hit ten moving route markers while elite fighters try to cut you off.', type:'relay', target:10, timeLimit:130, spawn:{asteroidInterval:1.25, enemyInterval:2.0, eliteChance:0.35, ramp:true}, reward:2200},
+  {id:'m34', name:'The Long Way Home', brief:'Cross twelve gates through a collapsing sector packed with debris and elites.', type:'relay', target:12, timeLimit:150, spawn:{asteroidInterval:0.9, enemyInterval:1.5, eliteChance:0.5, ramp:true}, reward:3000},
+  {id:'m35', name:'Apocalypse Protocol', brief:'Use experimental weapons to survive a collapsing asteroid storm, elite reinforcements, and eight flagship bosses.', type:'boss', bossName:'Apocalypse Protocol', bossCount:8, specialWeapons:FINAL_MISSION_WEAPONS,
+    spawn:{asteroidInterval:0.42, enemyInterval:0.72, eliteChance:0.78, ramp:true},
+    bossConfig:{radius:64, hp:420, speed:195, fireInterval:0.24, bulletSpeed:500, burstCount:10},
+    reward:10000},
 ];
 
 /* ---------------------------- game state ---------------------------- */
@@ -1347,7 +1418,8 @@ function updateArenaHUD(){
     ? `W THRUST · A/D ROTATE · SPACE FIRE · SHIFT ${secondary.name.toUpperCase()} · ESC EXIT ARENA`
     : 'W THRUST · A/D ROTATE · SPACE FIRE · ESC EXIT ARENA';
 
-  document.getElementById('arenaKillFeed').innerHTML = arenaKillFeed.map(l=>`<div>${l}</div>`).join('');
+  const killFeed = document.getElementById('arenaKillFeed');
+  killFeed.innerHTML = arenaKillFeed.map(l=>`<div>${l}</div>`).join('');
   const myEntry = arenaScoreboard.get(arenaMyId);
   document.getElementById('arenaMyKills').textContent = `KILLS: ${myEntry?myEntry.kills:0}`;
   document.getElementById('arenaPlayerCount').textContent = `${remotePlayers.size+1} PILOT${remotePlayers.size===0?'':'S'} ONLINE`;
@@ -1386,7 +1458,7 @@ function drawRemotePlayer(rp){
 }
 
 let mission = null;
-const bullets=[], enemyBullets=[], missiles=[], mines=[], asteroids=[], enemies=[], particles=[];
+const bullets=[], enemyBullets=[], missiles=[], mines=[], asteroids=[], enemies=[], particles=[], salvageCores=[];
 
 let shakeMag=0, shakeTime=0;
 function shake(mag){ shakeMag=mag; shakeTime=0.3; }
@@ -1429,9 +1501,10 @@ class Ship{
     this.shieldRegenTimer = shieldLvl.regenTime;
   }
   get stats(){
+    const specialWeapons = mission?.specialWeapons;
     return {
-      primary: WEAPONS[game.upgrades.equipped.primary],
-      secondary: game.upgrades.equipped.secondary ? WEAPONS[game.upgrades.equipped.secondary] : null,
+      primary: specialWeapons ? specialWeapons.primary : WEAPONS[game.upgrades.equipped.primary],
+      secondary: specialWeapons ? specialWeapons.secondary : (game.upgrades.equipped.secondary ? WEAPONS[game.upgrades.equipped.secondary] : null),
       eng: UPGRADE_TRACKS.engine.levels[game.upgrades.engine],
       hull: UPGRADE_TRACKS.hull.levels[game.upgrades.hull],
       shield: UPGRADE_TRACKS.shield.levels[game.upgrades.shield],
@@ -1576,7 +1649,7 @@ class Missile{
     this.x=x; this.y=y; this.angle=angle;
     this.vx=Math.sin(angle)*360; this.vy=-Math.cos(angle)*360;
     this.damage=damage; this.splash=splash;
-    this.radius=5; this.life=1.8; this.exploded=false;
+    this.radius=5; this.life=homing?Infinity:1.8; this.exploded=false;
     this.speed=360;
     this.homing=homing; this.findTarget=findTarget; this.turnRate=turnRate;
     this.color=color;
@@ -1585,7 +1658,10 @@ class Missile{
     if(this.homing && this.findTarget){
       const target = this.findTarget();
       if(target){
-        const desiredAngle = Math.atan2(target.x-this.x, -(target.y-this.y));
+        const desiredAngle = Math.atan2(
+          wrapDelta(this.x,target.x,canvas.width),
+          -wrapDelta(this.y,target.y,canvas.height),
+        );
         // Shortest-path angle diff, clamped to how far this missile can turn in one frame — same
         // pattern used for arena ghost-angle lerping elsewhere in this file.
         let da = desiredAngle - this.angle;
@@ -1598,7 +1674,7 @@ class Missile{
     }
     this.x = wrap(this.x+this.vx*dt, canvas.width);
     this.y = wrap(this.y+this.vy*dt, canvas.height);
-    this.life -= dt;
+    if(!this.homing) this.life -= dt;
     if(Math.random()<0.6) spawnParticles(this.x,this.y,this.color,1,0.2,20);
   }
 }
@@ -1719,6 +1795,24 @@ function spawnAsteroidAtEdge(){
   const size = Math.random()<0.65 ? 3 : 2;
   asteroids.push(new Asteroid(x,y,size));
 }
+function spawnSalvageCore(){
+  const a=rand(0,Math.PI*2), speed=rand(20,55);
+  const marginX=Math.min(32,canvas.width/2), marginY=Math.min(32,canvas.height/2);
+  salvageCores.push({
+    x:rand(marginX,canvas.width-marginX), y:rand(marginY,canvas.height-marginY),
+    vx:Math.cos(a)*speed, vy:Math.sin(a)*speed,
+    radius:11, life:16, pulse:rand(0,Math.PI*2),
+  });
+}
+function spawnRelayGate(){
+  const marginX=Math.min(90,canvas.width/2), marginY=Math.min(90,canvas.height/2);
+  let x=rand(marginX,canvas.width-marginX), y=rand(marginY,canvas.height-marginY);
+  for(let i=0;i<12 && dist2(ship,{x,y})<220*220;i++){
+    x=rand(marginX,canvas.width-marginX);
+    y=rand(marginY,canvas.height-marginY);
+  }
+  return {x,y,radius:30,pulse:rand(0,Math.PI*2)};
+}
 
 /* ---------------------------- enemies ---------------------------- */
 class Enemy{
@@ -1817,6 +1911,8 @@ function objectiveText(m){
   if(m.type==='asteroids') return `Destroy ${m.target} asteroids`;
   if(m.type==='enemies') return `Destroy ${m.target} enemy ships${m.timeLimit?` within ${m.timeLimit}s`:''}`;
   if(m.type==='survive') return `Survive ${m.target} seconds`;
+  if(m.type==='salvage') return `Recover ${m.target} signal cores`;
+  if(m.type==='relay') return `Fly through ${m.target} navigation gates${m.timeLimit?` within ${m.timeLimit}s`:''}`;
   if(m.type==='boss') return `Destroy the ${m.bossName||'enemy flagship'}`;
   if(m.type==='combo') return `Destroy ${m.comboTargets.enemies} enemy ships AND ${m.comboTargets.asteroids} asteroids`;
 }
@@ -1824,29 +1920,34 @@ function objectiveLabel(m){
   if(m.type==='asteroids') return `ASTEROIDS DESTROYED — ${mission.asteroidsDestroyed}/${m.target}`;
   if(m.type==='enemies') return `ENEMIES DESTROYED — ${mission.enemiesDestroyed}/${m.target}`;
   if(m.type==='survive') return `SURVIVE — ${Math.min(mission.timeElapsed,m.target).toFixed(0)}/${m.target}s`;
+  if(m.type==='salvage') return `SIGNAL CORES RECOVERED — ${mission.salvageRecovered}/${m.target}`;
+  if(m.type==='relay') return `NAVIGATION GATES — ${mission.relayPassed}/${m.target}`;
   if(m.type==='boss'){
     // find the live boss to read its current hp; if it's already dead, show 0
     const boss = enemies.find(e=>e.boss && !e.dead);
     const hp = boss ? Math.max(0,Math.ceil(boss.hp)) : 0;
-    return `${(m.bossName||'FLAGSHIP').toUpperCase()} INTEGRITY — ${hp}/${m.bossConfig.hp}`;
+    return `${(m.bossName||'FLAGSHIP').toUpperCase()} — ${mission.bossesDefeated}/${mission.bossCount} DEFEATED · INTEGRITY ${hp}/${m.bossConfig.hp}`;
   }
   if(m.type==='combo') return `ENEMIES ${mission.enemiesDestroyed}/${m.comboTargets.enemies} · ASTEROIDS ${mission.asteroidsDestroyed}/${m.comboTargets.asteroids}`;
 }
 
 function launchMission(id){
   const m = MISSIONS.find(mm=>mm.id===id);
-  bullets.length=0; enemyBullets.length=0; missiles.length=0; mines.length=0; asteroids.length=0; enemies.length=0; particles.length=0;
+  bullets.length=0; enemyBullets.length=0; missiles.length=0; mines.length=0; asteroids.length=0; enemies.length=0; particles.length=0; salvageCores.length=0;
   ship.reset();
   const hullLvl = UPGRADE_TRACKS.hull.levels[game.upgrades.hull];
   mission = {
     id:m.id, type:m.type, target:m.target, timeLimit:m.timeLimit, spawn:m.spawn,
     bossConfig:m.bossConfig||null,       // only used when type==='boss'
     comboTargets:m.comboTargets||null,   // only used when type==='combo'
-    timeElapsed:0, asteroidsDestroyed:0, enemiesDestroyed:0,
-    asteroidTimer:rand(0.4,1.0), enemyTimer:rand(0.8,1.6),
-    bossSpawned:false, bossDefeated:false, // only used when type==='boss'
+    specialWeapons:m.specialWeapons||null,
+    timeElapsed:0, asteroidsDestroyed:0, enemiesDestroyed:0, salvageRecovered:0,
+    relayPassed:0, relayGate:null,
+    asteroidTimer:rand(0.4,1.0), enemyTimer:rand(0.8,1.6), salvageTimer:2,
+    bossCount:m.bossCount||1, bossesSpawned:0, bossesDefeated:0, bossSpawnTimer:1,
     lives:hullLvl.maxLives, ended:false,
   };
+  if(m.type==='relay') mission.relayGate = spawnRelayGate();
   game.state='mission';
   showScreen(null);
   updateHUD();
@@ -1892,12 +1993,17 @@ function updateMission(dt){
   let intervalScale=1;
   if(mission.spawn.ramp) intervalScale = Math.max(0.45, 1 - mission.timeElapsed/180);
 
-  // boss missions: spawn the single named boss ~1s after launch, then never spawn another.
-  // Regular enemy spawns are still gated by spawn.enemyInterval, which boss missions set to
-  // Infinity, so this is purely additive and doesn't touch the normal-enemy spawn path below.
-  if(mission.type==='boss' && !mission.bossSpawned && mission.timeElapsed>=1.0){
-    spawnEnemyAtEdge(false, mission.bossConfig);
-    mission.bossSpawned = true;
+  // Boss encounters spawn one at a time, with a short breather between stages.
+  if(mission.type==='boss' && mission.bossesSpawned<mission.bossCount){
+    const bossAlive = enemies.some(e=>e.boss && !e.dead);
+    if(!bossAlive){
+      mission.bossSpawnTimer -= dt;
+      if(mission.bossSpawnTimer<=0){
+        spawnEnemyAtEdge(false, mission.bossConfig);
+        mission.bossesSpawned++;
+        mission.bossSpawnTimer = 6;
+      }
+    }
   }
 
   if(mission.spawn.asteroidInterval!==Infinity){
@@ -1915,6 +2021,13 @@ function updateMission(dt){
       mission.enemyTimer = mission.spawn.enemyInterval*intervalScale*rand(0.8,1.2);
     }
   }
+  if(mission.spawn.salvageInterval){
+    mission.salvageTimer -= dt;
+    if(mission.salvageTimer<=0 && salvageCores.length<5){
+      spawnSalvageCore();
+      mission.salvageTimer = mission.spawn.salvageInterval*intervalScale*rand(0.85,1.15);
+    }
+  }
 
   for(const b of bullets) b.update(dt);
   for(const b of enemyBullets) b.update(dt);
@@ -1923,6 +2036,26 @@ function updateMission(dt){
   for(const a of asteroids) a.update(dt);
   for(const e of enemies) e.update(dt,ship);
   for(const p of particles) p.update(dt);
+  for(const core of salvageCores){
+    core.x=wrap(core.x+core.vx*dt,canvas.width);
+    core.y=wrap(core.y+core.vy*dt,canvas.height);
+    core.life-=dt;
+    core.pulse+=dt;
+    if(dist2(core,ship)<(core.radius+ship.radius)*(core.radius+ship.radius)){
+      core.life=0;
+      mission.salvageRecovered++;
+      spawnParticles(core.x,core.y,'#4ff0ff',12,0.45,150);
+    }
+  }
+  if(mission.type==='relay' && mission.relayGate){
+    mission.relayGate.pulse += dt;
+    if(dist2(ship,mission.relayGate)<mission.relayGate.radius*mission.relayGate.radius){
+      mission.relayPassed++;
+      mission.relayGate = mission.relayPassed<mission.target ? spawnRelayGate() : null;
+      spawnParticles(ship.x,ship.y,'#4ff0ff',14,0.45,150);
+      shake(3);
+    }
+  }
 
   // player bullets vs asteroids
   for(const b of bullets){
@@ -1959,8 +2092,8 @@ function updateMission(dt){
         if(e.hp<=0){
           e.dead=true;
           mission.enemiesDestroyed++;
-          if(e.boss) mission.bossDefeated = true; // flips the 'boss' mission's completion check
-          spawnParticles(e.x,e.y, e.boss?'#ffb84d':(e.elite?'#ff3d81':'#ff7fae'), e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
+          if(e.boss) mission.bossesDefeated++;
+          spawnParticles(e.x,e.y, e.boss?'#4dff9f':(e.elite?'#ff3d81':'#ff7fae'), e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
           shake(e.boss?12:(e.elite?6:3));
         }
         break;
@@ -1997,8 +2130,8 @@ function updateMission(dt){
       if(e.hp<=0){
         e.dead=true;
         mission.enemiesDestroyed++;
-        if(e.boss) mission.bossDefeated = true;
-        spawnParticles(e.x,e.y, e.boss?'#ffb84d':'#ff3d81', e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
+        if(e.boss) mission.bossesDefeated++;
+        spawnParticles(e.x,e.y, e.boss?'#4dff9f':'#ff3d81', e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
         if(e.boss) shake(12);
       }
     }
@@ -2029,13 +2162,16 @@ function updateMission(dt){
   filterInPlace(mines, m=>!m.exploded);
   filterInPlace(asteroids, a=>!a.dead);
   filterInPlace(enemies, e=>!e.dead);
+  filterInPlace(salvageCores, core=>core.life>0);
   filterInPlace(particles, p=>p.life>0);
 
   if(mission.ended) return;
   if(mission.type==='asteroids' && mission.asteroidsDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='enemies' && mission.enemiesDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='survive' && mission.timeElapsed>=mission.target){ endMission(true); return; }
-  if(mission.type==='boss' && mission.bossDefeated){ endMission(true); return; }
+  if(mission.type==='salvage' && mission.salvageRecovered>=mission.target){ endMission(true); return; }
+  if(mission.type==='relay' && mission.relayPassed>=mission.target){ endMission(true); return; }
+  if(mission.type==='boss' && mission.bossesDefeated>=mission.bossCount){ endMission(true); return; }
   if(mission.type==='combo' && mission.enemiesDestroyed>=mission.comboTargets.enemies && mission.asteroidsDestroyed>=mission.comboTargets.asteroids){ endMission(true); return; }
 
   updateHUD();
@@ -2123,10 +2259,38 @@ function drawAsteroid(a){
   ctx.closePath(); ctx.stroke();
   ctx.restore();
 }
+function drawSalvageCore(core){
+  ctx.save();
+  ctx.translate(core.x,core.y);
+  const pulse=0.65+0.35*Math.sin(core.pulse*6);
+  ctx.globalAlpha=0.65+0.35*pulse;
+  ctx.strokeStyle='#4ff0ff'; ctx.shadowColor='#4ff0ff'; ctx.shadowBlur=12*pulse; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(0,-core.radius); ctx.lineTo(core.radius,0); ctx.lineTo(0,core.radius); ctx.lineTo(-core.radius,0);
+  ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+function drawRelayGate(gate){
+  ctx.save();
+  ctx.translate(gate.x,gate.y);
+  ctx.rotate(gate.pulse*0.45);
+  const pulse=0.75+0.25*Math.sin(gate.pulse*5);
+  ctx.globalAlpha=pulse;
+  ctx.strokeStyle='#ffb84d'; ctx.shadowColor='#ffb84d'; ctx.shadowBlur=14; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(0,0,gate.radius+Math.sin(gate.pulse*3)*3,0,Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-gate.radius*0.7,0); ctx.lineTo(0,-gate.radius*0.7);
+  ctx.lineTo(gate.radius*0.7,0); ctx.lineTo(0,gate.radius*0.7);
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
 function drawEnemy(e){
   ctx.save();
   ctx.translate(e.x,e.y); ctx.rotate(e.angle);
-  const color = e.boss ? '#ffb84d' : (e.elite?'#ff3d81':'#ff7fae');
+  const color = e.boss ? '#4dff9f' : (e.elite?'#ff3d81':'#ff7fae');
   ctx.strokeStyle = color;
   ctx.shadowColor = color; ctx.shadowBlur = e.boss?22:(e.elite?14:8);
   ctx.lineWidth = e.boss?3.5:(e.elite?2.5:2);
@@ -2171,6 +2335,8 @@ function render(dt){
       ctx.translate(rand(-s,s), rand(-s,s));
     }
     for(const a of asteroids) drawAsteroid(a);
+    for(const core of salvageCores) drawSalvageCore(core);
+    if(mission.type==='relay' && mission.relayGate) drawRelayGate(mission.relayGate);
     for(const e of enemies) drawEnemy(e);
     for(const b of bullets) drawBullet(b,b.color);
     for(const b of enemyBullets) drawBullet(b,'#ff3d81');
@@ -2219,7 +2385,7 @@ function updateHUD(){
     shieldRow.classList.add('hidden');
   }
 
-  const secondary = game.upgrades.equipped.secondary ? WEAPONS[game.upgrades.equipped.secondary] : null;
+  const {primary,secondary} = ship.stats;
   const secondaryRow = document.getElementById('hudMissile');
   if(secondary){
     secondaryRow.classList.remove('hidden');
@@ -2230,7 +2396,7 @@ function updateHUD(){
     secondaryRow.classList.add('hidden');
   }
   document.getElementById('hudHint').textContent = secondary
-    ? `W THRUST · A/D ROTATE · SPACE FIRE · SHIFT ${secondary.name.toUpperCase()} · ESC ABORT`
+    ? `W THRUST · A/D ROTATE · SPACE ${primary.name.toUpperCase()} · SHIFT ${secondary.name.toUpperCase()} · ESC ABORT`
     : 'W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT';
 
   const timerEl = document.getElementById('hudTimer');
@@ -2578,3 +2744,4 @@ boot();
 </body>
 
 </html>
+<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="47dc36ec-e281-4093-8e2d-49a4e7429c86" data-app-host="app.netlify.com"></script>
